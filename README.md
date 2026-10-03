@@ -8,32 +8,33 @@ Share this collection with your agent, tell it what to watch, and choose where a
 
 ## Shopping
 
-<a href="monitors/commerce/shopify/preview.png"><img src="monitors/commerce/shopify/preview.png" width="240" alt="" align="top"></a>
-<a href="monitors/commerce/marketplace/preview.png"><img src="monitors/commerce/marketplace/preview.png" width="240" alt="" align="top"></a>
-<a href="monitors/commerce/amazon/preview.png"><img src="monitors/commerce/amazon/preview.png" width="240" alt="" align="top"></a>
+<a href="commerce/shopify/preview.png"><img src="commerce/shopify/preview.png" width="240" alt="" align="top"></a>
+<a href="commerce/marketplace/preview.png"><img src="commerce/marketplace/preview.png" width="240" alt="" align="top"></a>
+<a href="commerce/amazon/preview.png"><img src="commerce/amazon/preview.png" width="240" alt="" align="top"></a>
 
-- **[Limited drops](monitors/commerce/shopify/README.md)** — Collabs, your size, restocks, price drops. · [code](monitors/commerce/shopify/source.go)
-- **[Marketplace](monitors/commerce/marketplace/README.md)** — Local finds by query, radius, and budget. · [code](monitors/commerce/marketplace/source.go)
-- **[Amazon](monitors/commerce/amazon/README.md)** — Seller + shipper + price rules. · [code](monitors/commerce/amazon/source.go)
+- **[Limited drops](commerce/shopify/README.md)** — Collabs, your size, restocks, price drops. · [code](commerce/shopify/source.go)
+- **[Marketplace](commerce/marketplace/README.md)** — Local finds by query, radius, and budget. · [code](commerce/marketplace/source.go)
+- **[Amazon](commerce/amazon/README.md)** — Seller + shipper + price rules. · [code](commerce/amazon/source.go)
 
 ## Travel & dining
 
-<a href="monitors/travel/global-entry/preview.png"><img src="monitors/travel/global-entry/preview.png" width="240" alt="" align="top"></a>
-<a href="monitors/travel/award-seats/preview.png"><img src="monitors/travel/award-seats/preview.png" width="240" alt="" align="top"></a>
-<a href="monitors/dining/tablecheck/preview.png"><img src="monitors/dining/tablecheck/preview.png" width="240" alt="" align="top"></a>
+<a href="travel/global-entry/preview.png"><img src="travel/global-entry/preview.png" width="240" alt="" align="top"></a>
+<a href="travel/award-seats/preview.png"><img src="travel/award-seats/preview.png" width="240" alt="" align="top"></a>
+<a href="dining/tablecheck/preview.png"><img src="dining/tablecheck/preview.png" width="240" alt="" align="top"></a>
 
-- **[Global Entry](monitors/travel/global-entry/README.md)** — Earlier interviews before your deadline. · [code](monitors/travel/global-entry/source.go)
-- **[Award seats](monitors/travel/award-seats/README.md)** — Premium cabins, enough seats, fewer points. · [code](monitors/travel/award-seats/source.go)
-- **[Reservations](monitors/dining/tablecheck/README.md)** — Your restaurant, party, and exact seating. · [code](monitors/dining/tablecheck/source.go)
+- **[Global Entry](travel/global-entry/README.md)** — Earlier interviews before your deadline. · [code](travel/global-entry/source.go)
+- **[Award seats](travel/award-seats/README.md)** — Premium cabins, enough seats, fewer points. · [code](travel/award-seats/source.go)
+- **[OpenTable](dining/opentable/README.md)** — Restaurant openings by date, party, and dinner window. · [code](dining/opentable/source.go)
+- **[Reservations](dining/tablecheck/README.md)** — Your restaurant, party, and exact seating. · [code](dining/tablecheck/source.go)
 
 ## Feeds & updates
 
-<a href="monitors/development/github-releases/preview.png"><img src="monitors/development/github-releases/preview.png" width="180" alt="" align="top"></a>
-<a href="monitors/media/youtube/preview.png"><img src="monitors/media/youtube/preview.png" width="180" alt="" align="top"></a>
-<a href="monitors/media/rss/preview.png"><img src="monitors/media/rss/preview.png" width="180" alt="" align="top"></a>
-<a href="monitors/infrastructure/statuspage/preview.png"><img src="monitors/infrastructure/statuspage/preview.png" width="180" alt="" align="top"></a>
+<a href="development/github-releases/preview.png"><img src="development/github-releases/preview.png" width="180" alt="" align="top"></a>
+<a href="media/youtube/preview.png"><img src="media/youtube/preview.png" width="180" alt="" align="top"></a>
+<a href="media/rss/preview.png"><img src="media/rss/preview.png" width="180" alt="" align="top"></a>
+<a href="infrastructure/statuspage/preview.png"><img src="infrastructure/statuspage/preview.png" width="180" alt="" align="top"></a>
 
-- **[GitHub](monitors/development/github-releases/README.md)** — Releases, prereleases, tag filters. · [code](monitors/development/github-releases/source.go)
-- **[YouTube](monitors/media/youtube/README.md)** — Uploads from channels you follow. · [code](monitors/media/youtube/source.go)
-- **[RSS & Atom](monitors/media/rss/README.md)** — Articles with title and category filters. · [code](monitors/media/rss/source.go)
-- **[Statuspage](monitors/infrastructure/statuspage/README.md)** — Component incidents and resolutions. · [code](monitors/infrastructure/statuspage/source.go)
+- **[GitHub](development/github-releases/README.md)** — Releases, prereleases, tag filters. · [code](development/github-releases/source.go)
+- **[YouTube](media/youtube/README.md)** — Uploads from channels you follow. · [code](media/youtube/source.go)
+- **[RSS & Atom](media/rss/README.md)** — Articles with title and category filters. · [code](media/rss/source.go)
+- **[Statuspage](infrastructure/statuspage/README.md)** — Component incidents and resolutions. · [code](infrastructure/statuspage/source.go)
