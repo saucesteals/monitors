@@ -103,9 +103,6 @@ func (s *browserSession) read(req *http.Request) ([]byte, int, error) {
 	ctx, cancel := context.WithTimeout(req.Context(), 20*time.Second)
 	defer cancel()
 	req = req.Clone(ctx)
-	for _, cookie := range s.jar.Cookies(req.URL) {
-		req.AddCookie(cookie)
-	}
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Cache-Control", "no-cache")
 	res, err := s.client.Do(req)
@@ -116,7 +113,6 @@ func (s *browserSession) read(req *http.Request) ([]byte, int, error) {
 	if res.Request != nil && res.Request.URL.String() != req.URL.String() {
 		return nil, res.StatusCode, fmt.Errorf("unexpected redirect; use the canonical restaurant profile URL")
 	}
-	s.jar.SetCookies(req.URL, res.Cookies())
 	body, err := io.ReadAll(io.LimitReader(res.Body, (8<<20)+1))
 	if err != nil {
 		return nil, res.StatusCode, fmt.Errorf("read response: %w", err)
@@ -193,7 +189,10 @@ func (m *monitor) fetchSession(ctx context.Context, s *browserSession, date stri
 
 func responseError(operation string, status int) error {
 	reason := fmt.Sprintf("%s HTTP %d", operation, status)
-	if status == 401 || status == 403 || status == 409 || status == 429 || status >= 500 {
+	if status == http.StatusConflict {
+		return fmt.Errorf("%s HTTP 409: persisted query may be outdated; revalidate the website operation", operation)
+	}
+	if status == 401 || status == 403 || status == 429 || status >= 500 {
 		return &accessError{reason: reason}
 	}
 

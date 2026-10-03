@@ -12,43 +12,21 @@ import (
 
 	http "github.com/saucesteals/fhttp"
 	"github.com/saucesteals/fhttp/cookiejar"
+	"github.com/saucesteals/mimic"
 	"github.com/saucesteals/monitord"
-	"github.com/saucesteals/monitord/catalog/httpx"
 )
 
 var proxySecret = monitord.RequiredSecret("proxies", "opentable")
 
-type browserClient interface {
-	Do(*http.Request) (*http.Response, error)
-	CloseIdleConnections()
-}
+// The SDK httpx helper pins Chrome 131 and has no fingerprint option.
+// OpenTable requires a newer profile, so use the same Mimic dependency with
+// an explicit version and a native cookie jar on each proxy-bound client.
+const browserVersion = "147.0.0.0"
 
-// Each SDK pool contains exactly one proxy: profile and API calls cannot
-// rotate independently. Cookies and CSRF are never shared between exits.
 type browserSession struct {
-	client    browserClient
-	newClient func() (browserClient, error)
-	jar       http.CookieJar
-	csrf      string
-}
-
-type singleProxySecret string
-
-func (s singleProxySecret) Get(ref monitord.SecretRef) (string, bool) {
-	if ref.Group != proxySecret.Group || ref.Key != proxySecret.Key {
-		return "", false
-	}
-
-	return string(s), true
-}
-
-func (s singleProxySecret) Require(ref monitord.SecretRef) (string, error) {
-	value, ok := s.Get(ref)
-	if !ok {
-		return "", errors.New("unknown proxy secret")
-	}
-
-	return value, nil
+	client *http.Client
+	proxy  *url.URL
+	csrf   string
 }
 
 func (m *monitor) startSessions(secrets monitord.SecretSet) (err error) {
@@ -71,28 +49,17 @@ func (m *monitor) startSessions(secrets monitord.SecretSet) (err error) {
 		}
 	}
 	for i, value := range values {
-		var create func() (browserClient, error)
+		session := &browserSession{}
 		if settings.UseProxy {
 			// Validate without including secret URLs in errors.
 			parsed, err := url.Parse(value)
-			if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https" && parsed.Scheme != "socks5") {
+			if err != nil || parsed.Hostname() == "" || parsed.Opaque != "" || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") || (parsed.Scheme != "http" && parsed.Scheme != "https" && parsed.Scheme != "socks5") {
 				return fmt.Errorf("invalid proxy at index %d", i)
 			}
-			raw, err := json.Marshal([]string{value})
-			if err != nil {
-				return errors.New("encode proxy configuration")
-			}
-			create = func() (browserClient, error) {
-				return httpx.NewProxyClient(singleProxySecret(raw), proxySecret)
-			}
-		} else {
-			create = func() (browserClient, error) {
-				return httpx.NewClient()
-			}
+			session.proxy = parsed
 		}
-		session := &browserSession{newClient: create}
 		if err := session.reset(); err != nil {
-			return fmt.Errorf("initialize session at index %d", i)
+			return fmt.Errorf("initialize session at index %d: %w", i, err)
 		}
 		m.sessions = append(m.sessions, session)
 	}
@@ -115,12 +82,24 @@ func (s *browserSession) reset() error {
 	if err != nil {
 		return fmt.Errorf("reset cookies: %w", err)
 	}
-	client, err := s.newClient()
+	var proxy func(*http.Request) (*url.URL, error)
+	if s.proxy != nil {
+		proxy = http.ProxyURL(s.proxy)
+	}
+	transport, err := mimic.NewTransport(mimic.TransportOptions{
+		Version:   browserVersion,
+		Brand:     mimic.BrandChrome,
+		Platform:  mimic.PlatformMac,
+		Transport: &http.Transport{Proxy: proxy},
+	})
 	if err != nil {
 		return errors.New("initialize browser transport")
 	}
-	s.client = client
-	s.jar = jar
+	s.client = &http.Client{
+		Transport: transport,
+		Jar:       jar,
+		Timeout:   20 * time.Second,
+	}
 
 	return nil
 }
