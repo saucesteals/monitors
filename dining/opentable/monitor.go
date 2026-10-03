@@ -5,14 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"slices"
 	"time"
 
-	http "github.com/saucesteals/fhttp"
-	"github.com/saucesteals/fhttp/cookiejar"
 	"github.com/saucesteals/monitord"
-	"github.com/saucesteals/monitord/catalog/httpx"
 
 	_ "time/tzdata" // Keep restaurant timezones available on minimal hosts.
 )
@@ -26,11 +24,11 @@ type snapshot struct {
 }
 
 type monitor struct {
-	client  *http.Client
-	zone    *time.Location
-	csrf    string
-	scope   string
-	minutes int
+	sessions []*browserSession
+	active   int
+	zone     *time.Location
+	scope    string
+	minutes  int
 }
 
 func main() {
@@ -42,14 +40,22 @@ func (*monitor) Info() monitord.Info {
 }
 
 func (m *monitor) Plan() monitord.Plan[State] {
-	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(2*time.Minute))
+	opts := []monitord.CommonOption{monitord.WithTimeout(2 * time.Minute)}
+	if settings.UseProxy {
+		opts = append(opts, monitord.WithSecrets(proxySecret))
+	}
+
+	return monitord.Every(settings.Interval, m.check, opts...)
 }
 
-func (m *monitor) Start(_ context.Context, _ monitord.Environment) error {
-	if settings.RestaurantID <= 0 || !regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(settings.Slug) || settings.Label == "" || settings.PartySize < 1 || settings.PartySize > 20 || len(settings.Dates) == 0 || len(settings.Dates) > 7 || settings.Interval < time.Minute {
-		return fmt.Errorf("configure a restaurant ID, slug, label, 1–7 dates, party of 1–20, and interval of at least one minute")
+func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
+	profile, err := url.Parse(settings.ProfileURL)
+	if err != nil || profile.Scheme != "https" || profile.Host != "www.opentable.com" || profile.User != nil || profile.RawQuery != "" || profile.Fragment != "" || !regexp.MustCompile(`^/(r/)?[a-z0-9-]+$`).MatchString(profile.Path) {
+		return fmt.Errorf("profile URL must be a canonical https://www.opentable.com restaurant URL without query parameters")
 	}
-	var err error
+	if settings.RestaurantID <= 0 || settings.Label == "" || settings.PartySize < 1 || settings.PartySize > 20 || len(settings.Dates) == 0 || len(settings.Dates) > 7 || settings.Interval < time.Minute {
+		return fmt.Errorf("configure a restaurant ID, profile URL, label, 1–7 dates, party of 1–20, and interval of at least one minute")
+	}
 	m.zone, err = time.LoadLocation(settings.Timezone)
 	if err != nil {
 		return fmt.Errorf("restaurant timezone: %w", err)
@@ -83,23 +89,12 @@ func (m *monitor) Start(_ context.Context, _ monitord.Environment) error {
 		return err
 	}
 	m.scope = fmt.Sprintf("%x", sha256.Sum256(raw))[:20]
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return fmt.Errorf("create session cookies: %w", err)
-	}
-	m.client, err = httpx.NewClient()
-	if err != nil {
-		return fmt.Errorf("create client: %w", err)
-	}
-	m.client.Jar = jar
-	m.client.Timeout = 20 * time.Second
-
-	return nil
+	return m.startSessions(env.Secrets())
 }
 
 func (m *monitor) Stop(context.Context) error {
-	if m.client != nil {
-		m.client.CloseIdleConnections()
+	for _, session := range m.sessions {
+		session.client.CloseIdleConnections()
 	}
 
 	return nil

@@ -18,30 +18,30 @@ import (
 	"github.com/saucesteals/monitord"
 )
 
-// OpenTable's web-client persisted query; not a credential. If the website
+// OpenTable's web-client persisted query (observed 2026-10-03); not a credential. If the website
 // retires it, fail without altering observations until the adapter is updated.
-const availabilityQuery = "cbcf4838a9b399f742e3741785df64560a826d8d3cc2828aa01ab09a8455e29e"
+const availabilityQuery = "dc57aa7007e98ebf3b878ad067400a4244ef5765c738f59c2c3e6efcf93f6b2d"
 
 var csrfPattern = regexp.MustCompile(`(?:__CSRF_TOKEN__|"__CSRF_TOKEN__"|"csrfToken")\s*[:=]\s*("(?:[^"\\]|\\.)*")`)
 
 type queryVariables struct {
-	RestaurantIDs                []int    `json:"restaurantIds"`
-	Date                         string   `json:"date"`
-	Time                         string   `json:"time"`
-	PartySize                    int      `json:"partySize"`
-	DatabaseRegion               string   `json:"databaseRegion"`
-	OnlyPop                      bool     `json:"onlyPop"`
-	RestaurantAvailabilityTokens []string `json:"restaurantAvailabilityTokens"`
-	LoyaltyRedemptionTiers       []string `json:"loyaltyRedemptionTiers"`
-	RequireTypes                 []string `json:"requireTypes"`
-	PrivilegedAccess             []string `json:"privilegedAccess"`
-	ForwardDays                  int      `json:"forwardDays"`
-	ForwardMinutes               int      `json:"forwardMinutes"`
-	BackwardMinutes              int      `json:"backwardMinutes"`
-	ForwardTimeslots             int      `json:"forwardTimeslots"`
-	BackwardTimeslots            int      `json:"backwardTimeslots"`
-	CorrelationID                string   `json:"correlationId"`
-	UseCBR                       bool     `json:"useCBR"`
+	RequireTimes                  bool     `json:"requireTimes"`
+	IncludeAvailableSpaces        bool     `json:"includeAvailableSpaces"`
+	IncludeMetaSearchListingSlots bool     `json:"includeMetaSearchListingSlots"`
+	RestaurantIDs                 []int    `json:"restaurantIds"`
+	Date                          string   `json:"date"`
+	Time                          string   `json:"time"`
+	PartySize                     int      `json:"partySize"`
+	DatabaseRegion                string   `json:"databaseRegion"`
+	OnlyPop                       bool     `json:"onlyPop"`
+	RestaurantAvailabilityTokens  []string `json:"restaurantAvailabilityTokens"`
+	LoyaltyRedemptionTiers        []string `json:"loyaltyRedemptionTiers"`
+	RequireTypes                  []string `json:"requireTypes"`
+	PrivilegedAccess              []string `json:"privilegedAccess"`
+	ForwardDays                   int      `json:"forwardDays"`
+	ForwardMinutes                int      `json:"forwardMinutes"`
+	BackwardMinutes               int      `json:"backwardMinutes"`
+	CorrelationID                 string   `json:"correlationId"`
 }
 
 type queryResponse struct {
@@ -71,10 +71,10 @@ func correlationID() string {
 }
 
 func profileURL() string {
-	return "https://www.opentable.com/r/" + settings.Slug
+	return settings.ProfileURL
 }
 
-func (m *monitor) bootstrap(ctx context.Context) error {
+func (s *browserSession) bootstrap(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, profileURL(), nil)
 	if err != nil {
 		return err
@@ -84,29 +84,39 @@ func (m *monitor) bootstrap(ctx context.Context) error {
 	req.Header.Set("Sec-Fetch-Mode", "navigate")
 	req.Header.Set("Sec-Fetch-Site", "none")
 	req.Header.Set("Upgrade-Insecure-Requests", "1")
-	body, status, err := m.read(req)
+	body, status, err := s.read(req)
 	if err != nil {
 		return err
 	}
 	if status != http.StatusOK {
-		return fmt.Errorf("profile HTTP %d", status)
+		return responseError("profile", status)
 	}
 	match := csrfPattern.FindSubmatch(body)
-	if len(match) != 2 || json.Unmarshal(match[1], &m.csrf) != nil || m.csrf == "" {
-		return fmt.Errorf("profile did not supply a CSRF token")
+	if len(match) != 2 || json.Unmarshal(match[1], &s.csrf) != nil || s.csrf == "" {
+		return &accessError{reason: "profile did not supply a CSRF token (challenge or changed page)"}
 	}
 
 	return nil
 }
 
-func (m *monitor) read(req *http.Request) ([]byte, int, error) {
+func (s *browserSession) read(req *http.Request) ([]byte, int, error) {
+	ctx, cancel := context.WithTimeout(req.Context(), 20*time.Second)
+	defer cancel()
+	req = req.Clone(ctx)
+	for _, cookie := range s.jar.Cookies(req.URL) {
+		req.AddCookie(cookie)
+	}
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Cache-Control", "no-cache")
-	res, err := m.client.Do(req)
+	res, err := s.client.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("opentable request: %w", err)
+		return nil, 0, &accessError{reason: "opentable transport failed"}
 	}
 	defer func() { _ = res.Body.Close() }()
+	if res.Request != nil && res.Request.URL.String() != req.URL.String() {
+		return nil, res.StatusCode, fmt.Errorf("unexpected redirect; use the canonical restaurant profile URL")
+	}
+	s.jar.SetCookies(req.URL, res.Cookies())
 	body, err := io.ReadAll(io.LimitReader(res.Body, (8<<20)+1))
 	if err != nil {
 		return nil, res.StatusCode, fmt.Errorf("read response: %w", err)
@@ -118,9 +128,9 @@ func (m *monitor) read(req *http.Request) ([]byte, int, error) {
 	return body, res.StatusCode, nil
 }
 
-func (m *monitor) fetch(ctx context.Context, date string) ([]string, error) {
-	if m.csrf == "" {
-		if err := m.bootstrap(ctx); err != nil {
+func (m *monitor) fetchSession(ctx context.Context, s *browserSession, date string) ([]string, error) {
+	if s.csrf == "" {
+		if err := s.bootstrap(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -146,7 +156,6 @@ func (m *monitor) fetch(ctx context.Context, date string) ([]string, error) {
 			RequireTypes:                 []string{"Standard"},
 			PrivilegedAccess:             []string{},
 			ForwardMinutes:               m.minutes,
-			ForwardTimeslots:             m.minutes/15 + 16,
 			CorrelationID:                correlationID(),
 		},
 	}
@@ -156,44 +165,39 @@ func (m *monitor) fetch(ctx context.Context, date string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Refresh an expired anonymous session once; do not spin on access denial.
-	for attempt := range 2 {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://www.opentable.com/dapi/fe/gql?optype=query&opname=RestaurantsAvailability", bytes.NewReader(payload))
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Origin", "https://www.opentable.com")
-		req.Header.Set("Referer", profileURL())
-		req.Header.Set("Ot-Page-Type", "restprofilepage")
-		req.Header.Set("Ot-Page-Group", "rest-profile")
-		req.Header.Set("X-CSRF-Token", m.csrf)
-		req.Header.Set("X-Query-Timeout", "5500")
-		req.Header.Set("Sec-Fetch-Dest", "empty")
-		req.Header.Set("Sec-Fetch-Mode", "cors")
-		req.Header.Set("Sec-Fetch-Site", "same-origin")
-		body, status, err := m.read(req)
-		if err != nil {
-			return nil, err
-		}
-		if status == http.StatusUnauthorized || status == http.StatusForbidden {
-			m.csrf = ""
-			if attempt == 0 {
-				if err := m.bootstrap(ctx); err != nil {
-					return nil, err
-				}
-				continue
-			}
-		}
-		if status != http.StatusOK {
-			return nil, fmt.Errorf("availability HTTP %d", status)
-		}
-
-		return m.decode(body, date)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://www.opentable.com/dapi/fe/gql?optype=query&opname=RestaurantsAvailability", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Origin", "https://www.opentable.com")
+	req.Header.Set("Referer", profileURL())
+	req.Header.Set("Ot-Page-Type", "restprofilepage")
+	req.Header.Set("Ot-Page-Group", "rest-profile")
+	req.Header.Set("X-CSRF-Token", s.csrf)
+	req.Header.Set("X-Query-Timeout", "5500")
+	req.Header.Set("Sec-Fetch-Dest", "empty")
+	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	body, status, err := s.read(req)
+	if err != nil {
+		return nil, err
+	}
+	if status != http.StatusOK {
+		return nil, responseError("availability", status)
 	}
 
-	return nil, fmt.Errorf("session refresh failed")
+	return m.decode(body, date)
+}
+
+func responseError(operation string, status int) error {
+	reason := fmt.Sprintf("%s HTTP %d", operation, status)
+	if status == 401 || status == 403 || status == 409 || status == 429 || status >= 500 {
+		return &accessError{reason: reason}
+	}
+
+	return fmt.Errorf("%s", reason)
 }
 
 func (m *monitor) decode(body []byte, date string) ([]string, error) {
@@ -227,10 +231,17 @@ func (m *monitor) decode(body []byte, date string) ([]string, error) {
 			}
 			matched = true
 			for _, slot := range *day.Slots {
-				if slot.Available == nil || slot.Offset == nil || slot.Type == "" {
+				if slot.Available == nil {
+					return nil, fmt.Errorf("missing slot availability")
+				}
+				// The live API omits time/type on unavailable placeholders.
+				if !*slot.Available {
+					continue
+				}
+				if slot.Offset == nil || slot.Type == "" {
 					return nil, fmt.Errorf("incomplete slot")
 				}
-				if !*slot.Available || slot.Type != "Standard" || *slot.Offset < 0 || *slot.Offset > m.minutes {
+				if slot.Type != "Standard" || *slot.Offset < 0 || *slot.Offset > m.minutes {
 					continue
 				}
 				local := base.Add(time.Duration(*slot.Offset) * time.Minute).Format("2006-01-02T15:04")
