@@ -38,3 +38,7 @@ Share this collection with your agent, tell it what to watch, and choose where a
 - **[YouTube](media/youtube/README.md)** — Uploads from channels you follow. · [code](media/youtube/source.go)
 - **[RSS & Atom](media/rss/README.md)** — Articles with title and category filters. · [code](media/rss/source.go)
 - **[Statuspage](infrastructure/statuspage/README.md)** — Component incidents and resolutions. · [code](infrastructure/statuspage/source.go)
+
+## Security
+
+- **[CVE alerts](security/cve/README.md)** — Product, keyword, and reference matches; severity filters and revision alerts. · [code](security/cve/source.go)
