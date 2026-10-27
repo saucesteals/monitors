@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	http "github.com/saucesteals/fhttp"
-	"github.com/saucesteals/monitord"
 	"io"
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/saucesteals/monitord"
 )
 
 type requestBody struct {
@@ -122,7 +123,6 @@ func (m *monitor) search(ctx context.Context, date string) (map[string]Offer, er
 	req.Header.Set("Content-Type", "text/plain;charset=UTF-8")
 	req.Header.Set("Origin", "https://www.alaskaair.com")
 	req.Header.Set("Referer", "https://www.alaskaair.com/")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Cache-Control", "no-cache")
 	res, err := m.client.Do(req)
 	if err != nil {

@@ -21,6 +21,8 @@ Each date starts silently. Alerts for new qualifying itineraries, returning inve
 
 `IgnoreSeatCounts` optionally suppresses known source-specific phantom inventory counts; no value is assumed globally. Results are search observations, not held seats. Direct requests use the SDK's browser-compatible HTTP client. Set `UseProxy: true` to use the declared `proxies/award-seats` JSON-array secret. `monitor.yaml` expires after 90 days.
 
+The HTTP client uses standard `net/http` types through monitord's `catalog/httpx`. Mimic and the browser headers come from the SDK's default profile, with no separate version pin or hard-coded User-Agent in this example.
+
 ## Recipes
 
 ### One stop, business only
