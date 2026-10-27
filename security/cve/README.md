@@ -2,6 +2,16 @@
 
 New and materially changed CVEs for a configurable software watchlist. Reads the public [NVD CVE API](https://nvd.nist.gov/developers/vulnerabilities); no account is required. The optional `nvd/api-key` secret can be supplied through monitord's secret resolver.
 
+## API key: optional, not extra data
+
+- **Without a key:** NVD permits 5 requests per rolling 30-second window.
+- **With a key:** NVD permits 50 requests per rolling 30-second window.
+- Both access the same CVE data. A key does not unlock additional fields, extra CVEs, or earlier disclosures; it raises the request allowance.
+
+This example spaces requests at least **six seconds apart whether or not a key is supplied**, so adding a key does **not** speed up its polling or pagination. Keyless operation is sufficient for the default hourly watch. The optional secret supports deployments that already use an NVD key; taking advantage of the higher allowance would require changing the request pacing while respecting NVD's limits and guidance.
+
+See NVD's [documented API limits and best practices](https://nvd.nist.gov/developers/start-here). Other clients sharing an outbound IP or key can also consume the applicable allowance.
+
 ## Configure
 
 The example watches **OpenSSH**, with a minimum CVSS of **7.0**, while also notifying about matching records that have not been scored yet. Edit `defaultWatchlist` in `config.go` before first deployment, or replace the watchlist through typed state afterward:
