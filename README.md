@@ -8,12 +8,12 @@ Share this collection with your agent, tell it what to watch, and choose where a
 
 ## SDK compatibility
 
-All 12 examples build and pass `go vet` with these upstream versions (checked 2026-10-27):
+All 13 examples build and pass `go vet` with these upstream versions (checked 2026-10-27):
 
 - monitord: `v0.0.0-20261022022052-57d2a46c9343`
 - Shop (Amazon and Marketplace): `v0.0.0-20261002000718-1a7a960631f5`
 
-OpenTable and award-seats use monitord's `catalog/httpx` with standard `net/http` types. The SDK supplies Mimic and its browser profile; the examples do not pin a separate Mimic version or override the browser User-Agent. Other examples use standard HTTP or the Shop SDK.
+Apple Store, OpenTable and award-seats use monitord's `catalog/httpx` with standard `net/http` types. The SDK supplies Mimic and its browser profile; the examples do not pin a separate Mimic version or override the browser User-Agent. Other examples use standard HTTP or the Shop SDK.
 
 Build compatibility does not guarantee a third-party endpoint remains available. Configure an example and run `monitord test` before deploying it; this checks a poll without sending alerts or saving state.
 
@@ -26,6 +26,7 @@ Build compatibility does not guarantee a third-party endpoint remains available.
 - **[Limited drops](commerce/shopify/README.md)** — Collabs, your size, restocks, price drops. · [code](commerce/shopify/source.go)
 - **[Marketplace](commerce/marketplace/README.md)** — Local finds by query, radius, and budget. · [code](commerce/marketplace/source.go)
 - **[Amazon](commerce/amazon/README.md)** — Seller + shipper + price rules. · [code](commerce/amazon/source.go)
+- **[Apple Store](commerce/apple-store/README.md)** — Pickup restocks by part number, location, and store. · [code](commerce/apple-store/source.go)
 
 ## Travel & dining
 
