@@ -6,6 +6,17 @@ Drops, deals, openings, and updates. Built with [monitord](https://github.com/sa
 
 Share this collection with your agent, tell it what to watch, and choose where alerts should go. Your agent can read the monitor’s README, customize its configuration, and run it with [monitord](https://github.com/saucesteals/monitord).
 
+## SDK compatibility
+
+All 12 examples build and pass `go vet` with these upstream versions (checked 2026-10-27):
+
+- monitord: `v0.0.0-20261022022052-57d2a46c9343`
+- Shop (Amazon and Marketplace): `v0.0.0-20261002000718-1a7a960631f5`
+
+OpenTable and award-seats use monitord's `catalog/httpx` with standard `net/http` types. The SDK supplies Mimic and its browser profile; the examples do not pin a separate Mimic version or override the browser User-Agent. Other examples use standard HTTP or the Shop SDK.
+
+Build compatibility does not guarantee a third-party endpoint remains available. Configure an example and run `monitord test` before deploying it; this checks a poll without sending alerts or saving state.
+
 ## Shopping
 
 <a href="commerce/shopify/preview.png"><img src="commerce/shopify/preview.png" width="240" alt="" align="top"></a>

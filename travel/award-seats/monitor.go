@@ -5,12 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	http "github.com/saucesteals/fhttp"
-	"github.com/saucesteals/monitord"
-	"github.com/saucesteals/monitord/catalog/httpx"
+	"net/http"
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/saucesteals/monitord"
+	"github.com/saucesteals/monitord/catalog/httpx"
 )
 
 var proxySecret = monitord.RequiredSecret("proxies", "award-seats")
