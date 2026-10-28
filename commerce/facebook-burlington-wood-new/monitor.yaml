@@ -4,7 +4,7 @@ health:
 deliveries:
   - discord:
       account: jarvis
-      channel_id: "1557018438587916389"
+      channel_id: "1565146342962106560"
       mentions: none
     rate_limit:
       per_second: 1
