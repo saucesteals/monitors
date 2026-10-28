@@ -1,0 +1,4 @@
+github.com/saucesteals/shop v0.0.0-20261002000718-1a7a960631f5 h1:3aBrG9BnkBnRRIwcBcAGhX4XAGN6pBqfScKzZnOPAEg=
+github.com/saucesteals/shop v0.0.0-20261002000718-1a7a960631f5/go.mod h1:bGBBUPz39rQxcY51Lgqz2TSvIGAROElTwPtmU48UARI=
+golang.org/x/net v0.58.0 h1:ynWG7rqYi4ccpTEuPZ2QGWHktVEM9DMCj9yzDE0Q7To=
+golang.org/x/net v0.58.0/go.mod h1:YwCddHnFlT7eLQqVprV19OnhLGtc5xOKgE0RyqgfWAU=

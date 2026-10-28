@@ -1,0 +1,11 @@
+persistent: true
+health:
+  failure_threshold: 3
+deliveries:
+  - discord:
+      account: jarvis
+      channel_id: "1557018438587916389"
+      mentions: none
+    rate_limit:
+      per_second: 1
+      burst: 3
