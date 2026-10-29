@@ -30,10 +30,8 @@ type transport interface {
 }
 
 type monitor struct {
-	client   transport
-	scope    string
-	pool     *ispPool
-	failures int
+	client transport
+	scope  string
 }
 
 var proxies = monitord.RequiredSecret("proxies", "apple-store")
@@ -78,10 +76,7 @@ func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
 	}
 	m.scope = fmt.Sprintf("%x", sha256.Sum256(raw))[:20]
 	if settings.UseProxy {
-		m.pool, err = newISPPool(env.Secrets())
-		if err == nil {
-			m.client = m.pool.current
-		}
+		m.client, err = httpx.NewProxyClient(env.Secrets(), proxies)
 	} else {
 		m.client, err = httpx.NewClient()
 	}
@@ -105,18 +100,8 @@ func (m *monitor) check(ctx context.Context, session *monitord.Session[State]) e
 	}
 	stores, err := m.fetch(ctx)
 	if err != nil {
-		m.failures++
-		if m.pool != nil && m.failures >= m.pool.size {
-			if rotateErr := m.pool.rotate(session.Secrets()); rotateErr != nil {
-				return rotateErr
-			}
-			m.client = m.pool.current
-			m.failures = 0
-		}
-
 		return err
 	}
-	m.failures = 0
 
 	next := snapshot{
 		Available: make(map[string]bool),

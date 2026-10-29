@@ -20,7 +20,7 @@ UseProxy:   false,
 - **Parts:** exact regional part numbers for each finish/storage/configuration. The placeholder intentionally fails validation until replaced. Supports 1–16 parts in one request; a marketing name or base model number is not enough.
 - **StoreIDs:** empty means all stores Apple returns for the location—not every store nationally. Set explicit `R…` IDs to restrict coverage. These must appear in that location's response; the setting does not expand Apple's search radius.
 - **Interval:** five seconds to 24 hours; defaults to one minute. Checks are serialized, with this delay after each completed check, not an exact start-to-start cadence. Default expiry is 30 days in `monitor.yaml`.
-- **UseProxy:** optional. Declare `proxies/apple-store` as a JSON array of ISP proxy URLs when enabled. The monitor shuffles the pool in memory and keeps a cadence-sized working set (one to four exits) instead of cold-connecting through the entire list. A fully failed working set advances to the next exits. Clients are created in `Start`, reused between checks, and closed on replacement or `Stop`. Proxy mode never falls back to direct access. Direct and proxy clients use the SDK's Mimic browser profile; no browser version is pinned here.
+- **UseProxy:** optional. Declare `proxies/apple-store` as a JSON array of proxy URLs when enabled. The SDK's `httpx.NewProxyClient` handles proxy rotation; the client is created once in `Start`, reused between checks, and closed in `Stop`. Proxy mode never falls back to direct access. Direct and proxy clients use the SDK's Mimic browser profile; no browser version is pinned here.
 
 ### Find part numbers and stores
 
