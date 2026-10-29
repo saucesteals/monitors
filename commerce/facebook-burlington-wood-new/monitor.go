@@ -14,7 +14,10 @@ import (
 	"github.com/saucesteals/shop/provider/facebook"
 )
 
-type State struct{}
+type State struct {
+	Scope string          `json:"scope"`
+	Seen  map[string]bool `json:"seen"`
+}
 type Cursor struct {
 	Seen map[string]bool `json:"seen"`
 }
@@ -39,7 +42,7 @@ func (*monitor) Info() monitord.Info {
 }
 
 func (m *monitor) Plan() monitord.Plan[State] {
-	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(2*time.Minute))
+	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(4*time.Minute))
 }
 
 func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
@@ -89,20 +92,26 @@ func (m *monitor) check(ctx context.Context, s *monitord.Session[State]) error {
 	slog.InfoContext(ctx, "marketplace scan complete", "listings", len(items), "matching", matched)
 	raw, _ := json.Marshal(sourceIdentity())
 	scope := fmt.Sprintf("%x", sha256.Sum256(raw))[:20]
-	key := "source:" + scope
-	var cursor Cursor
-	found, err := s.Checkpoint(key, &cursor)
-	if err != nil {
-		return err
-	}
+	state := s.State()
+	cursor := Cursor{Seen: state.Seen}
 	if cursor.Seen == nil {
-		cursor.Seen = map[string]bool{}
+		// One-time migration of this deployment's original checkpoint. Its
+		// observations survive the move to operator-editable dedupe state.
+		if _, err := s.Checkpoint("source:9783fb1da603646ddc83", &cursor); err != nil {
+			return err
+		}
+		if cursor.Seen == nil {
+			cursor.Seen = map[string]bool{}
+		}
 	}
-	if !found {
+	if state.Scope != scope {
 		for _, item := range items {
 			cursor.Seen[item.ID] = true
 		}
-		return s.Commit(ctx, func(tx *monitord.Tx[State]) error { return tx.Checkpoint(key, cursor) })
+		return s.Commit(ctx, func(tx *monitord.Tx[State]) error {
+			*tx.State = State{Scope: scope, Seen: cursor.Seen}
+			return nil
+		})
 	}
 	// Bounded commits let large feeds progress without exceeding the outbox cap.
 	for start := 0; start < len(items); start += 128 {
@@ -123,13 +132,14 @@ func (m *monitor) check(ctx context.Context, s *monitord.Session[State]) error {
 				events = append(events, event)
 			}
 		}
-		if err = s.Commit(ctx, func(tx *monitord.Tx[State]) error {
+		if err := s.Commit(ctx, func(tx *monitord.Tx[State]) error {
 			for _, event := range events {
 				if err := tx.Emit(event); err != nil {
 					return err
 				}
 			}
-			return tx.Checkpoint(key, next)
+			*tx.State = State{Scope: scope, Seen: next.Seen}
+			return nil
 		}); err != nil {
 			return err
 		}

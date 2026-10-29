@@ -6,15 +6,12 @@ import (
 	"github.com/saucesteals/monitord"
 	"github.com/saucesteals/shop"
 	"log/slog"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
 
 func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
-	include := regexp.MustCompile(settings.Include)
-	exclude := regexp.MustCompile(settings.Exclude)
 	found := map[string]shop.ProductSummary{}
 	for _, query := range settings.Queries {
 		for page := 1; page <= settings.Pages; page++ {
@@ -42,6 +39,9 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 			if !result.HasMore {
 				break
 			}
+			if page == settings.Pages {
+				return nil, fmt.Errorf("marketplace query %q still has more results after %d pages; refusing a truncated scan", query, page)
+			}
 		}
 	}
 	ids := make([]string, 0, len(found))
@@ -52,8 +52,9 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	var out []Observation
 	for _, id := range ids {
 		p := found[id]
-		match := p.Price != nil && p.Price.Currency == settings.Currency && p.Price.Amount >= settings.MinCents && p.Price.Amount <= settings.MaxCents && include.MatchString(p.Title) && (settings.Exclude == "" || !exclude.MatchString(p.Title))
-		out = append(out, Observation{ID: id, Match: match, Event: listingEvent(p)})
+		// Relevance and price are requested upstream. Do not discard Facebook
+		// results using title regexes or a second local relevance classifier.
+		out = append(out, Observation{ID: id, Match: true, Event: listingEvent(p)})
 	}
 	return out, nil
 }
