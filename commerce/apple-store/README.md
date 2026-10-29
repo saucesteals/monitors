@@ -19,8 +19,8 @@ UseProxy:   false,
 - **Location:** a postal code accepted by that storefront. `10001` is an illustrative New York search area.
 - **Parts:** exact regional part numbers for each finish/storage/configuration. The placeholder intentionally fails validation until replaced. Supports 1–16 parts in one request; a marketing name or base model number is not enough.
 - **StoreIDs:** empty means all stores Apple returns for the location—not every store nationally. Set explicit `R…` IDs to restrict coverage. These must appear in that location's response; the setting does not expand Apple's search radius.
-- **Interval:** at least one minute. Default expiry is 30 days in `monitor.yaml`.
-- **UseProxy:** optional. Declare `proxies/apple-store` as a JSON array of proxy URLs when enabled. Direct and proxy clients use the SDK's Mimic browser profile; no browser version is pinned here.
+- **Interval:** five seconds to 24 hours; defaults to one minute. Checks are serialized, with this delay after each completed check, not an exact start-to-start cadence. Default expiry is 30 days in `monitor.yaml`.
+- **UseProxy:** optional. Declare `proxies/apple-store` as a JSON array of proxy URLs when enabled. The SDK's `httpx.NewProxyClient` handles proxy rotation; the client is created once in `Start`, reused between checks, and closed in `Stop`. Proxy mode never falls back to direct access. Direct and proxy clients use the SDK's Mimic browser profile; no browser version is pinned here.
 
 ### Find part numbers and stores
 
@@ -38,7 +38,7 @@ The first complete response establishes a **silent baseline**. An alert is emitt
 
 Store/part identity, observations and event sequence are durable. Events and the next snapshot are committed atomically. Changing location, storefront, parts or selected stores starts a fresh baseline; reordering the lists or changing interval/proxy settings does not.
 
-Responses must contain every selected part and every explicitly requested store, with consistent availability flags. HTTP errors, application errors, missing fields and ambiguous availability preserve the previous inventory. Failures use durable exponential backoff (2–32 minutes, or the configured interval if longer), honoring a longer `Retry-After`. Success resets backoff. No rapid retry loop.
+Responses must contain every selected part and every explicitly requested store, with consistent availability flags. HTTP errors, application errors, missing fields and ambiguous availability preserve the previous inventory. Requests, including body reads, have a 12-second deadline within a 14-second callback budget. A failed poll returns its real error and retries on the next scheduled check; no nested retry loop or synthetic cooldown failures. Legacy cooldown fields remain decodable but no longer delay polls, so upgrading preserves inventory and event sequences.
 
 With automatic store selection, newly returned or reappearing stores start silently. A store omitted from a response is not assumed to have sold out. Use explicit store IDs when missing coverage should instead fail the poll.
 
