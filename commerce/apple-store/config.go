@@ -36,8 +36,8 @@ func validate() error {
 	if strings.TrimSpace(settings.Location) == "" || len(settings.Location) > 32 {
 		return fmt.Errorf("set a postal code or location for the chosen storefront")
 	}
-	if settings.Interval < time.Minute || settings.Interval > 24*time.Hour {
-		return fmt.Errorf("interval must be between one minute and 24 hours")
+	if settings.Interval < 5*time.Second || settings.Interval > 24*time.Hour {
+		return fmt.Errorf("interval must be between five seconds and 24 hours")
 	}
 	if len(settings.Parts) == 0 || len(settings.Parts) > 16 || len(settings.StoreIDs) > 32 {
 		return fmt.Errorf("configure 1–16 parts and at most 32 store IDs")

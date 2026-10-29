@@ -17,10 +17,11 @@ import (
 type State struct{}
 
 type snapshot struct {
-	Available   map[string]bool `json:"available"`
-	Sequence    uint64          `json:"sequence"`
-	Failures    int             `json:"failures"`
-	NextAttempt time.Time       `json:"next_attempt,omitempty"`
+	Available map[string]bool `json:"available"`
+	Sequence  uint64          `json:"sequence"`
+	// The SDK rejects unknown checkpoint fields; retain legacy decode fields.
+	Failures    int       `json:"failures,omitempty"`
+	NextAttempt time.Time `json:"next_attempt,omitempty"`
 }
 
 type transport interface {
@@ -29,11 +30,15 @@ type transport interface {
 }
 
 type monitor struct {
-	client transport
-	scope  string
+	client   transport
+	scope    string
+	pool     *ispPool
+	failures int
 }
 
 var proxies = monitord.RequiredSecret("proxies", "apple-store")
+
+const requestTimeout = 12 * time.Second
 
 func main() {
 	monitord.Run(&monitor{})
@@ -48,10 +53,10 @@ func (*monitor) Info() monitord.Info {
 
 func (m *monitor) Plan() monitord.Plan[State] {
 	if settings.UseProxy {
-		return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(30*time.Second), monitord.WithSecrets(proxies))
+		return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(requestTimeout+2*time.Second), monitord.WithSecrets(proxies))
 	}
 
-	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(30*time.Second))
+	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(requestTimeout+2*time.Second))
 }
 
 func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
@@ -73,7 +78,10 @@ func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
 	}
 	m.scope = fmt.Sprintf("%x", sha256.Sum256(raw))[:20]
 	if settings.UseProxy {
-		m.client, err = httpx.NewProxyClient(env.Secrets(), proxies)
+		m.pool, err = newISPPool(env.Secrets())
+		if err == nil {
+			m.client = m.pool.current
+		}
 	} else {
 		m.client, err = httpx.NewClient()
 	}
@@ -95,22 +103,20 @@ func (m *monitor) check(ctx context.Context, session *monitord.Session[State]) e
 	if _, err := session.Checkpoint(key, &previous); err != nil {
 		return err
 	}
-	if time.Now().Before(previous.NextAttempt) {
-		return fmt.Errorf("apple backoff until %s", previous.NextAttempt.UTC().Format(time.RFC3339))
-	}
-	stores, retry, err := m.fetch(ctx)
+	stores, err := m.fetch(ctx)
 	if err != nil {
-		previous.Failures = min(previous.Failures+1, 5)
-		delay := max(settings.Interval, time.Minute*time.Duration(1<<previous.Failures), retry)
-		previous.NextAttempt = time.Now().Add(delay)
-		if commitErr := session.Commit(ctx, func(tx *monitord.Tx[State]) error {
-			return tx.Checkpoint(key, previous)
-		}); commitErr != nil {
-			return fmt.Errorf("save backoff: %w", commitErr)
+		m.failures++
+		if m.pool != nil && m.failures >= m.pool.size {
+			if rotateErr := m.pool.rotate(session.Secrets()); rotateErr != nil {
+				return rotateErr
+			}
+			m.client = m.pool.current
+			m.failures = 0
 		}
 
 		return err
 	}
+	m.failures = 0
 
 	next := snapshot{
 		Available: make(map[string]bool),
