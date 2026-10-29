@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/saucesteals/monitord"
+	"github.com/saucesteals/monitord/catalog/httpx"
 	"github.com/saucesteals/shop"
 	"github.com/saucesteals/shop/provider/facebook"
 )
@@ -30,8 +31,11 @@ type Observation struct {
 
 type monitor struct {
 	client *http.Client
+	pool   *httpx.ProxyClient
 	store  shop.Store
 }
+
+var proxies = monitord.RequiredSecret("proxies", "isps")
 
 func main() {
 	monitord.Run(&monitor{})
@@ -42,7 +46,7 @@ func (*monitor) Info() monitord.Info {
 }
 
 func (m *monitor) Plan() monitord.Plan[State] {
-	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(4*time.Minute))
+	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(4*time.Minute), monitord.WithSecrets(proxies))
 }
 
 func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
@@ -50,7 +54,12 @@ func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
 		return err
 	}
 
-	m.client = &http.Client{Timeout: 20 * time.Second, Transport: &burlingtonTransport{base: http.DefaultTransport.(*http.Transport).Clone()}, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+	var err error
+	m.pool, err = httpx.NewProxyClient(env.Secrets(), proxies)
+	if err != nil {
+		return err
+	}
+	m.client = &http.Client{Timeout: 20 * time.Second, Transport: &burlingtonTransport{base: m.pool}, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return fmt.Errorf("too many redirects")
 		}
@@ -62,9 +71,9 @@ func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
 		}
 		return nil
 	}}
-	var err error
 	m.store, err = facebook.New(m.client)
 	if err != nil {
+		m.pool.CloseIdleConnections()
 		return err
 	}
 	return nil

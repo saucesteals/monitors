@@ -7,6 +7,14 @@ require (
 	github.com/saucesteals/shop v0.0.0-20261002000718-1a7a960631f5
 )
 
-require golang.org/x/net v0.58.0 // indirect
+require (
+	github.com/andybalholm/brotli v1.2.2 // indirect
+	github.com/klauspost/compress v1.20.3 // indirect
+	github.com/saucesteals/mimic v1.1.0-beta.4 // indirect
+	github.com/saucesteals/tlsx v0.1.1 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+)
 
 replace github.com/saucesteals/monitord => /Users/jarvis/.monitord/lib

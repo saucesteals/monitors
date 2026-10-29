@@ -12,12 +12,15 @@ import (
 // dedicated alias to Burlington CT, and expand state abbreviations because
 // Facebook's place typeahead returns empty results for many "Town, CT" queries.
 type burlingtonTransport struct {
-	base *http.Transport
+	base interface {
+		Do(*http.Request) (*http.Response, error)
+		CloseIdleConnections()
+	}
 }
 
 func (t *burlingtonTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Host != "www.facebook.com" {
-		return t.base.RoundTrip(req)
+		return t.base.Do(req)
 	}
 	if req.URL.Path == "/marketplace/burlingtonct/search/" {
 		req = req.Clone(req.Context())
@@ -55,7 +58,7 @@ func (t *burlingtonTransport) RoundTrip(req *http.Request) (*http.Response, erro
 		}
 	}
 
-	return t.base.RoundTrip(req)
+	return t.base.Do(req)
 }
 
 func (t *burlingtonTransport) CloseIdleConnections() {
