@@ -13,6 +13,7 @@ import (
 
 func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	found := map[string]shop.ProductSummary{}
+	verificationFailures := 0
 	for _, query := range settings.Queries {
 		for page := 1; page <= settings.Pages; page++ {
 			result, err := m.store.Search(ctx, &shop.SearchQuery{Query: query, Page: page, Sort: shop.SortNewest, MinPrice: &settings.MinCents, MaxPrice: &settings.MaxCents, Filters: map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"}})
@@ -24,10 +25,11 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 			}
 			slog.InfoContext(ctx, "marketplace query page", "query", query, "page", page, "products", len(result.Products), "warnings", result.Warnings)
 			// Unverifiable listings are omitted by the SDK and remain eligible on
-			// later scans. Fail if verification discarded the entire page.
+			// later scans. A rejected page must not discard other valid pages.
 			for _, warning := range result.Warnings {
 				if len(result.Products) == 0 && (strings.Contains(warning, "without a verifiable Marketplace city") || strings.Contains(warning, "incomplete Marketplace listing")) {
-					return nil, fmt.Errorf("incomplete marketplace feed: %s", warning)
+					verificationFailures++
+					slog.WarnContext(ctx, "marketplace page lost to verification", "query", query, "page", page, "warning", warning)
 				}
 			}
 			for _, p := range result.Products {
@@ -43,6 +45,9 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 				return nil, fmt.Errorf("marketplace query %q still has more results after %d pages; refusing a truncated scan", query, page)
 			}
 		}
+	}
+	if len(found) == 0 && verificationFailures > 0 {
+		return nil, fmt.Errorf("incomplete marketplace feed: no verified listings and %d verification warnings", verificationFailures)
 	}
 	ids := make([]string, 0, len(found))
 	for id := range found {
