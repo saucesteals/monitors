@@ -15,7 +15,7 @@ The pinned Shop SDK accepts only alphabetic city slugs. The local transport maps
 
 The module uses the installed monitord SDK at /Users/jarvis/.monitord/lib. Pass this directory's absolute path to monitord test and deploy.
 
-The transport expands CT/MA/NY/RI state abbreviations in place-lookup queries: live checks returned empty results for abbreviated Connecticut names and valid coordinates for full names. Unverifiable listings are excluded and remain eligible on later scans; a page entirely lost to verification errors fails the callback. Normal out-of-radius removals are not errors. Coverage is limited to Facebook's returned pages, not exhaustive inventory.
+Shop resolves city-page display names first and requires an exact city-page ID; the transport no longer rewrites state names. Unverifiable listings are excluded and remain eligible on later scans. An empty verification-filtered page does not discard other valid pages; the callback fails if verification warnings leave the whole scan without valid listings. Normal out-of-radius removals are not errors. Coverage is limited to Facebook's returned pages, not exhaustive inventory.
 
 ## Query audit — 2026-10-28
 
