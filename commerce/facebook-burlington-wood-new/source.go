@@ -15,8 +15,17 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	found := map[string]shop.ProductSummary{}
 	verificationFailures := 0
 	for _, query := range settings.Queries {
+		cursor := ""
+		seenCursors := make(map[string]bool)
 		for page := 1; page <= settings.Pages; page++ {
-			result, err := m.store.Search(ctx, &shop.SearchQuery{Query: query, Page: page, Sort: shop.SortNewest, MinPrice: &settings.MinCents, MaxPrice: &settings.MaxCents, Filters: map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"}})
+			result, err := m.store.Search(ctx, &shop.SearchQuery{
+				Query:    query,
+				Cursor:   cursor,
+				Sort:     shop.SortNewest,
+				MinPrice: &settings.MinCents,
+				MaxPrice: &settings.MaxCents,
+				Filters:  map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"},
+			})
 			if err != nil {
 				return nil, fmt.Errorf("marketplace search: %w", err)
 			}
@@ -44,6 +53,11 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 			if page == settings.Pages {
 				return nil, fmt.Errorf("marketplace query %q still has more results after %d pages; refusing a truncated scan", query, page)
 			}
+			if result.NextCursor == "" || seenCursors[result.NextCursor] {
+				return nil, fmt.Errorf("marketplace query %q returned a missing or repeated cursor", query)
+			}
+			cursor = result.NextCursor
+			seenCursors[cursor] = true
 		}
 	}
 	if len(found) == 0 && verificationFailures > 0 {
