@@ -3,65 +3,38 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/saucesteals/monitord"
-	"github.com/saucesteals/shop"
 	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/saucesteals/monitord"
+	"github.com/saucesteals/shop"
 )
 
 func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	found := map[string]shop.ProductSummary{}
-	verificationFailures := 0
 	for _, query := range settings.Queries {
-		cursor := ""
-		seenCursors := make(map[string]bool)
-		for page := 1; page <= settings.Pages; page++ {
-			result, err := m.store.Search(ctx, &shop.SearchQuery{
-				Query:    query,
-				Cursor:   cursor,
-				Sort:     shop.SortNewest,
-				MinPrice: &settings.MinCents,
-				MaxPrice: &settings.MaxCents,
-				Filters:  map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"},
-			})
-			if err != nil {
-				return nil, fmt.Errorf("marketplace search: %w", err)
-			}
-			if result == nil {
-				return nil, fmt.Errorf("missing search result")
-			}
-			slog.InfoContext(ctx, "marketplace query page", "query", query, "page", page, "products", len(result.Products), "warnings", result.Warnings)
-			// Unverifiable listings are omitted by the SDK and remain eligible on
-			// later scans. A rejected page must not discard other valid pages.
-			for _, warning := range result.Warnings {
-				if len(result.Products) == 0 && (strings.Contains(warning, "without a verifiable Marketplace city") || strings.Contains(warning, "incomplete Marketplace listing")) {
-					verificationFailures++
-					slog.WarnContext(ctx, "marketplace page lost to verification", "query", query, "page", page, "warning", warning)
-				}
-			}
-			for _, p := range result.Products {
-				if p.ID == "" || p.Title == "" {
-					return nil, fmt.Errorf("incomplete listing")
-				}
-				found[p.ID] = p
-			}
-			if !result.HasMore {
-				break
-			}
-			if page == settings.Pages {
-				return nil, fmt.Errorf("marketplace query %q still has more results after %d pages; refusing a truncated scan", query, page)
-			}
-			if result.NextCursor == "" || seenCursors[result.NextCursor] {
-				return nil, fmt.Errorf("marketplace query %q returned a missing or repeated cursor", query)
-			}
-			cursor = result.NextCursor
-			seenCursors[cursor] = true
+		result, err := m.store.SearchFirstPage(ctx, &shop.SearchQuery{
+			Query:    query,
+			Sort:     shop.SortNewest,
+			MinPrice: &settings.MinCents,
+			MaxPrice: &settings.MaxCents,
+			Filters:  map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("marketplace query %q: %w", query, err)
 		}
-	}
-	if len(found) == 0 && verificationFailures > 0 {
-		return nil, fmt.Errorf("incomplete marketplace feed: no verified listings and %d verification warnings", verificationFailures)
+		if result == nil {
+			return nil, fmt.Errorf("missing search result")
+		}
+		slog.InfoContext(ctx, "marketplace first page", "query", query, "products", len(result.Products), "has_more", result.HasMore, "warnings", result.Warnings)
+		for _, p := range result.Products {
+			if p.ID == "" || p.Title == "" {
+				return nil, fmt.Errorf("incomplete listing")
+			}
+			found[p.ID] = p
+		}
 	}
 	ids := make([]string, 0, len(found))
 	for id := range found {
@@ -71,7 +44,7 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	var out []Observation
 	for _, id := range ids {
 		p := found[id]
-		// Relevance and price are requested upstream. Do not discard Facebook
+		// Relevance, location and price are requested upstream. Do not discard Facebook
 		// results using title regexes or a second local relevance classifier.
 		out = append(out, Observation{ID: id, Match: true, Event: listingEvent(p)})
 	}
@@ -88,7 +61,7 @@ func listingEvent(p shop.ProductSummary) monitord.Event {
 	}
 	location, _ := p.Attributes["location"].(string)
 	if location == "" {
-		location = settings.City
+		location = "Not listed"
 	}
-	return monitord.Event{ID: "listing:" + p.ID, Title: p.Title, Description: "**New matching listing** · Facebook Marketplace", URL: p.URL, Image: p.ImageURL, Color: 0x71B89B, Fields: []monitord.EventField{{Name: "Price", Value: price, Inline: true}, {Name: "Location", Value: location, Inline: true}, {Name: "Pickup radius", Value: strings.ReplaceAll(settings.Radius, "mi", " mi"), Inline: true}}, Mentions: []string{}}
+	return monitord.Event{ID: "listing:" + p.ID, Title: p.Title, Description: "**New matching listing** · Facebook Marketplace", URL: p.URL, Image: p.ImageURL, Color: 0x71B89B, Fields: []monitord.EventField{{Name: "Price", Value: price, Inline: true}, {Name: "Location", Value: location, Inline: true}, {Name: "Search radius", Value: strings.ReplaceAll(settings.Radius, "mi", " mi") + " (Facebook filter)", Inline: true}}, Mentions: []string{}}
 }

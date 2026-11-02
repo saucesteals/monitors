@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/saucesteals/monitord v0.0.0
-	github.com/saucesteals/shop v0.0.0-20261102035229-0ea9645fe4d9
+	github.com/saucesteals/shop v0.0.0-20261102185038-100650d71faa
 )
 
 require (

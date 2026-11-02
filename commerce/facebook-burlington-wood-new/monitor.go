@@ -11,7 +11,6 @@ import (
 
 	"github.com/saucesteals/monitord"
 	"github.com/saucesteals/monitord/catalog/httpx"
-	"github.com/saucesteals/shop"
 	"github.com/saucesteals/shop/provider/facebook"
 )
 
@@ -32,7 +31,7 @@ type Observation struct {
 type monitor struct {
 	client *http.Client
 	pool   *httpx.ProxyClient
-	store  shop.Store
+	store  *facebook.Store
 }
 
 var proxies = monitord.RequiredSecret("proxies", "isps")
