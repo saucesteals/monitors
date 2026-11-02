@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/saucesteals/monitord"
-	"github.com/saucesteals/shop"
 	"github.com/saucesteals/shop/provider/facebook"
 )
 
@@ -25,8 +25,9 @@ type Observation struct {
 }
 
 type monitor struct {
-	client *http.Client
-	store  shop.Store
+	client           *http.Client
+	store            *facebook.Store
+	include, exclude *regexp.Regexp
 }
 
 func main() {
@@ -41,23 +42,14 @@ func (m *monitor) Plan() monitord.Plan[State] {
 	return monitord.Every(settings.Interval, m.check, monitord.WithTimeout(45*time.Second))
 }
 
-func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
+func (m *monitor) Start(_ context.Context, _ monitord.Environment) error {
 	if err := validate(); err != nil {
 		return err
 	}
 
-	m.client = &http.Client{Timeout: 20 * time.Second, Transport: http.DefaultTransport.(*http.Transport).Clone(), CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 5 {
-			return fmt.Errorf("too many redirects")
-		}
-		if req.URL.Scheme != "https" {
-			return fmt.Errorf("HTTPS redirect required")
-		}
-		if len(via) > 0 && req.URL.Host != via[0].URL.Host {
-			req.Header.Del("Authorization")
-		}
-		return nil
-	}}
+	m.include = regexp.MustCompile(settings.Include)
+	m.exclude = regexp.MustCompile(settings.Exclude)
+	m.client = &http.Client{Timeout: 20 * time.Second, Transport: http.DefaultTransport.(*http.Transport).Clone()}
 	var err error
 	m.store, err = facebook.New(m.client)
 	if err != nil {

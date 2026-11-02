@@ -3,42 +3,37 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/saucesteals/monitord"
-	"github.com/saucesteals/shop"
-	"regexp"
+	"log/slog"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/saucesteals/monitord"
+	"github.com/saucesteals/shop"
 )
 
 func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
-	include := regexp.MustCompile(settings.Include)
-	exclude := regexp.MustCompile(settings.Exclude)
 	found := map[string]shop.ProductSummary{}
 	for _, query := range settings.Queries {
-		for page := 1; page <= settings.Pages; page++ {
-			result, err := m.store.Search(ctx, &shop.SearchQuery{Query: query, Page: page, Sort: shop.SortNewest, MinPrice: &settings.MinCents, MaxPrice: &settings.MaxCents, Filters: map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"}})
-			if err != nil {
-				return nil, fmt.Errorf("marketplace search: %w", err)
+		result, err := m.store.SearchFirstPage(ctx, &shop.SearchQuery{
+			Query:    query,
+			Sort:     shop.SortNewest,
+			MinPrice: &settings.MinCents,
+			MaxPrice: &settings.MaxCents,
+			Filters:  map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("marketplace query %q: %w", query, err)
+		}
+		if result == nil {
+			return nil, fmt.Errorf("missing search result")
+		}
+		slog.InfoContext(ctx, "marketplace first page", "query", query, "products", len(result.Products), "has_more", result.HasMore, "warnings", result.Warnings)
+		for _, p := range result.Products {
+			if p.ID == "" || p.Title == "" {
+				return nil, fmt.Errorf("incomplete listing")
 			}
-			if result == nil {
-				return nil, fmt.Errorf("missing search result")
-			}
-			// Do not silently advance a baseline when location filtering discarded the feed.
-			for _, warning := range result.Warnings {
-				if strings.Contains(warning, "were removed") {
-					return nil, fmt.Errorf("incomplete marketplace feed: %s", warning)
-				}
-			}
-			for _, p := range result.Products {
-				if p.ID == "" || p.Title == "" {
-					return nil, fmt.Errorf("incomplete listing")
-				}
-				found[p.ID] = p
-			}
-			if !result.HasMore {
-				break
-			}
+			found[p.ID] = p
 		}
 	}
 	ids := make([]string, 0, len(found))
@@ -49,7 +44,7 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	var out []Observation
 	for _, id := range ids {
 		p := found[id]
-		match := p.Price != nil && p.Price.Currency == settings.Currency && p.Price.Amount >= settings.MinCents && p.Price.Amount <= settings.MaxCents && include.MatchString(p.Title) && (settings.Exclude == "" || !exclude.MatchString(p.Title))
+		match := p.Price != nil && p.Price.Currency == settings.Currency && p.Price.Amount >= settings.MinCents && p.Price.Amount <= settings.MaxCents && m.include.MatchString(p.Title) && (settings.Exclude == "" || !m.exclude.MatchString(p.Title))
 		out = append(out, Observation{ID: id, Match: match, Event: listingEvent(p)})
 	}
 	return out, nil
@@ -65,7 +60,7 @@ func listingEvent(p shop.ProductSummary) monitord.Event {
 	}
 	location, _ := p.Attributes["location"].(string)
 	if location == "" {
-		location = settings.City
+		location = "Not listed"
 	}
-	return monitord.Event{ID: "listing:" + p.ID, Title: p.Title, Description: "**New matching listing** · Facebook Marketplace", URL: p.URL, Image: p.ImageURL, Color: 0x71B89B, Fields: []monitord.EventField{{Name: "Price", Value: price, Inline: true}, {Name: "Location", Value: location, Inline: true}, {Name: "Pickup radius", Value: strings.ReplaceAll(settings.Radius, "mi", " mi"), Inline: true}}, Mentions: []string{}}
+	return monitord.Event{ID: "listing:" + p.ID, Title: p.Title, Description: "**New matching listing** · Facebook Marketplace", URL: p.URL, Image: p.ImageURL, Color: 0x71B89B, Fields: []monitord.EventField{{Name: "Price", Value: price, Inline: true}, {Name: "Location", Value: location, Inline: true}, {Name: "Search radius", Value: strings.ReplaceAll(settings.Radius, "mi", " mi") + " (Facebook filter)", Inline: true}}, Mentions: []string{}}
 }
