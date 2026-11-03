@@ -40,7 +40,7 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 		p := found[id]
 		// Relevance, location and price are requested upstream. Do not discard Facebook
 		// results using title regexes or a second local relevance classifier.
-		out = append(out, Observation{ID: id, Match: true, Event: listingEvent(p)})
+		out = append(out, Observation{ID: id, Event: listingEvent(p)})
 	}
 	return out, nil
 }

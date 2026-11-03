@@ -25,7 +25,6 @@ type Cursor struct {
 type Observation struct {
 	ID    string
 	Event monitord.Event
-	Match bool
 }
 
 type monitor struct {
@@ -80,13 +79,8 @@ func (m *monitor) check(ctx context.Context, s *monitord.Session[State]) error {
 		return err
 	}
 	// The endpoint/filter fingerprint keeps independently configured watches apart.
-	matched := 0
-	for _, item := range items {
-		if item.Match {
-			matched++
-		}
-	}
-	slog.InfoContext(ctx, "marketplace scan complete", "listings", len(items), "matching", matched)
+	slog.InfoContext(ctx, "marketplace scan complete", "listings", len(items))
+
 	raw, _ := json.Marshal(sourceIdentity())
 	scope := fmt.Sprintf("%x", sha256.Sum256(raw))[:20]
 	state := s.State()
@@ -123,11 +117,9 @@ func (m *monitor) check(ctx context.Context, s *monitord.Session[State]) error {
 				continue
 			}
 			next.Seen[item.ID] = true
-			if item.Match {
-				event := item.Event
-				event.ID = "marketplace:" + scope + ":" + item.ID
-				events = append(events, event)
-			}
+			event := item.Event
+			event.ID = "marketplace:" + scope + ":" + item.ID
+			events = append(events, event)
 		}
 		if err := s.Commit(ctx, func(tx *monitord.Tx[State]) error {
 			for _, event := range events {

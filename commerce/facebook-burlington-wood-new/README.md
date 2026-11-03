@@ -1,5 +1,7 @@
 # Burlington wood listings
 
+Local specialization of `saucesteals/monitors/commerce/marketplace` (main `16737bf`): same Shop provider, coordinate filters, listing conversion, and atomic dedupe/event pattern. Local differences are the proxy client, firewood settings/delivery, first-page-only scans, and preserved operator-visible state. No local title/price matching layer is needed; the requested filters are sent upstream.
+
 Uses Shop's anonymous, stateless Facebook Marketplace search with explicit Burlington, Connecticut coordinates (41.7692, -72.965), a requested 20-mile radius, newest sort, and current/previous UTC day buckets.
 
 - One `firewood` query and one native first-page GraphQL request every 30 seconds. No HTML bootstrap, JavaScript discovery, pagination, authentication token, or downstream relevance/radius filtering.
