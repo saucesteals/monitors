@@ -17,18 +17,12 @@ func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	found := map[string]shop.ProductSummary{}
 	for _, query := range settings.Queries {
 		for page := 1; page <= settings.Pages; page++ {
-			result, err := m.store.Search(ctx, &shop.SearchQuery{Query: query, Page: page, Sort: shop.SortNewest, MinPrice: &settings.MinCents, MaxPrice: &settings.MaxCents, Filters: map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"}})
+			result, err := m.store.Search(ctx, &shop.SearchQuery{Query: query, Page: page, Sort: shop.SortNewest, MinPrice: &settings.MinCents, MaxPrice: &settings.MaxCents, Filters: map[string]string{"latitude": strconv.FormatFloat(settings.Latitude, 'f', -1, 64), "longitude": strconv.FormatFloat(settings.Longitude, 'f', -1, 64), "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"}})
 			if err != nil {
 				return nil, fmt.Errorf("marketplace search: %w", err)
 			}
 			if result == nil {
 				return nil, fmt.Errorf("missing search result")
-			}
-			// Do not silently advance a baseline when location filtering discarded the feed.
-			for _, warning := range result.Warnings {
-				if strings.Contains(warning, "were removed") {
-					return nil, fmt.Errorf("incomplete marketplace feed: %s", warning)
-				}
 			}
 			for _, p := range result.Products {
 				if p.ID == "" || p.Title == "" {
@@ -65,7 +59,7 @@ func listingEvent(p shop.ProductSummary) monitord.Event {
 	}
 	location, _ := p.Attributes["location"].(string)
 	if location == "" {
-		location = settings.City
+		location = "Not listed"
 	}
-	return monitord.Event{ID: "listing:" + p.ID, Title: p.Title, Description: "**New matching listing** · Facebook Marketplace", URL: p.URL, Image: p.ImageURL, Color: 0x71B89B, Fields: []monitord.EventField{{Name: "Price", Value: price, Inline: true}, {Name: "Location", Value: location, Inline: true}, {Name: "Pickup radius", Value: strings.ReplaceAll(settings.Radius, "mi", " mi"), Inline: true}}, Mentions: []string{}}
+	return monitord.Event{ID: "listing:" + p.ID, Title: p.Title, Description: "**New matching listing** · Facebook Marketplace", URL: p.URL, Image: p.ImageURL, Color: 0x71B89B, Fields: []monitord.EventField{{Name: "Price", Value: price, Inline: true}, {Name: "Location", Value: location, Inline: true}, {Name: "Search radius (Facebook filter)", Value: strings.ReplaceAll(settings.Radius, "mi", " mi"), Inline: true}}, Mentions: []string{}}
 }
