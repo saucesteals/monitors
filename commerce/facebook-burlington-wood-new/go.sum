@@ -6,6 +6,8 @@ github.com/saucesteals/mimic v1.1.0-beta.4 h1:o9WcCDU/iRHAavbkjJydQff0PBkmajYKn3
 github.com/saucesteals/mimic v1.1.0-beta.4/go.mod h1:5ZpOx8s72+cvFxSVt2alUeGPHV+YKROj24hbpcxwx44=
 github.com/saucesteals/shop v0.0.0-20261102185038-100650d71faa h1:A1orfPwHdkgY+BOLDvCDw+XW8TPcRoajGsRHTGVtyZA=
 github.com/saucesteals/shop v0.0.0-20261102185038-100650d71faa/go.mod h1:bGBBUPz39rQxcY51Lgqz2TSvIGAROElTwPtmU48UARI=
+github.com/saucesteals/shop v0.0.0-20261103082107-8a23fb309faf h1:1HphnFzw0gFK595jQeBjffOyh5NC4h87k+HJNCHvMkI=
+github.com/saucesteals/shop v0.0.0-20261103082107-8a23fb309faf/go.mod h1:bGBBUPz39rQxcY51Lgqz2TSvIGAROElTwPtmU48UARI=
 github.com/saucesteals/tlsx v0.1.1 h1:8/u6pd/V2mF3ZfJB93PAaG9t1K84z4+B90dXiL5M6xU=
 github.com/saucesteals/tlsx v0.1.1/go.mod h1:DNgr5biB8G+TexAk6ZTbYTVvfpD7HysBdLOCsXmRfYg=
 github.com/xyproto/randomstring v1.0.5 h1:YtlWPoRdgMu3NZtP45drfy1GKoojuR7hmRcnhZqKjWU=

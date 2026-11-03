@@ -15,13 +15,7 @@ import (
 func (m *monitor) fetch(ctx context.Context) ([]Observation, error) {
 	found := map[string]shop.ProductSummary{}
 	for _, query := range settings.Queries {
-		result, err := m.store.SearchFirstPage(ctx, &shop.SearchQuery{
-			Query:    query,
-			Sort:     shop.SortNewest,
-			MinPrice: &settings.MinCents,
-			MaxPrice: &settings.MaxCents,
-			Filters:  map[string]string{"city": settings.City, "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"},
-		})
+		result, err := m.store.Search(ctx, &shop.SearchQuery{Query: query, Sort: shop.SortNewest, MinPrice: &settings.MinCents, MaxPrice: &settings.MaxCents, Filters: map[string]string{"latitude": strconv.FormatFloat(settings.Latitude, 'f', -1, 64), "longitude": strconv.FormatFloat(settings.Longitude, 'f', -1, 64), "radius": settings.Radius, "days_since_listed": strconv.Itoa(settings.Days), "shipping": "false"}})
 		if err != nil {
 			return nil, fmt.Errorf("marketplace query %q: %w", query, err)
 		}

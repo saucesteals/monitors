@@ -58,18 +58,7 @@ func (m *monitor) Start(_ context.Context, env monitord.Environment) error {
 	if err != nil {
 		return err
 	}
-	m.client = &http.Client{Timeout: 20 * time.Second, Transport: &burlingtonTransport{base: m.pool}, CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 5 {
-			return fmt.Errorf("too many redirects")
-		}
-		if req.URL.Scheme != "https" {
-			return fmt.Errorf("HTTPS redirect required")
-		}
-		if len(via) > 0 && req.URL.Host != via[0].URL.Host {
-			req.Header.Del("Authorization")
-		}
-		return nil
-	}}
+	m.client = &http.Client{Timeout: 20 * time.Second, Transport: &facebookTransport{base: m.pool}, CheckRedirect: func(*http.Request, []*http.Request) error { return fmt.Errorf("marketplace redirect refused") }}
 	m.store, err = facebook.New(m.client)
 	if err != nil {
 		m.pool.CloseIdleConnections()
